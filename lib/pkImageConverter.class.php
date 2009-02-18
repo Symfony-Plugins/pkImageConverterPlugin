@@ -7,7 +7,7 @@
  * utilities that never allocate a two-dimensional image in memory.
  * This makes importing huge JPEGs practical. 
  *
- * The netpbm utilities must be installed. Good hosts like pair have them,
+ * The netpbm utilities must be installed. Good hosts have them,
  * others can easily install them ('apt-get install netpbm',
  * 'yum install netpbm-progs', etc. as appropriate to the OS). They are
  * available for MacOS X here:
@@ -38,13 +38,13 @@
  *
  * pkImageConverter::scaleToFit("inputfile.jpg", "outputfile.jpg", 400, 300);
  *
- * Or to produce an image which is 50% of original size:
- *
- * pkImageConverter::scaleByFactor("inputfile.jpg", "outputfile.jpg", 0.5);
- *
  * If width or height is false (not zero), the other parameter will be
  * honored exactly and the mising parameter will be scaled accordingly to 
  * preserve the aspect ratio.
+ *
+ * Or to produce an image which is 50% of original size:
+ *
+ * pkImageConverter::scaleByFactor("inputfile.jpg", "outputfile.jpg", 0.5);
  *
  * Sometimes preserving the entire input image is not as important as
  * producing a copy with a certain aspect ratio. To scale and crop at
@@ -64,7 +64,7 @@
  * for creating images that you intend to crop with CSS. The result is
  * prettier than letterboxing.
 
- * pkImageConverter::caleToNarrowerAxis("inputfile.jpg", "outputfile.jpg",
+ * pkImageConverter::scaleToNarrowerAxis("inputfile.jpg", "outputfile.jpg",
      600, 450); 
  *
  * An optional JPEG quality argument may be specified as the final argument

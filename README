@@ -1,0 +1,92 @@
+# pkImageConverter plugin #
+
+"What is pkImageConverterPlugin?"
+
+pkImageConverterPlugin performs netpbm-based image conversions that don't 
+run the risk of bumping into PHP's memory limit. These use scanline-based 
+command line utilities that never allocate a two-dimensional image in memory.
+This makes importing huge originals practical.
+
+## Requirements ##
+
+The netpbm utilities must be installed. Good hosts have them,
+others can easily install them ('apt-get install netpbm',
+'yum install netpbm-progs', etc. as appropriate to the OS). They are
+available for MacOS X here:
+
+http://netpbm.darwinports.com/
+
+Even after you do that, though, they probably won't be in 
+the PATH environment variable for MAMP servers. So type:
+
+`which ppmtogif`
+
+Make a note of the folder it's in, and set things up in `app.yml`
+to help pkImageConverter find the programs:
+
+    all:
+      pkimageconverter:
+        path: /wherever/they/are
+
+Be sure to do a `symfony cc` and the tools should now be found.
+Note that you can use different settings for dev and prod to get
+this working on your development PC and the production server.
+
+This code probably won't work without modification on a Windows host.
+
+## Usage ##
+
+Scale to largest size that does not exceed a width of 400 pixels or a
+height of 300 pixels, but preserve aspect ratio, so the final image
+will not be exactly 400x300 unless the original has a 4/3 ratio:
+
+    pkImageConverter::scaleToFit("inputfile.jpg", "outputfile.jpg", 400, 300);
+
+If width or height is false (not zero), the other parameter will be
+honored exactly and the mising parameter will be scaled accordingly to 
+preserve the aspect ratio.
+
+Or to produce an image which is 50% of original size:
+
+    pkImageConverter::scaleByFactor("inputfile.jpg", "outputfile.jpg", 0.5);
+
+Sometimes preserving the entire input image is not as important as
+producing a copy with a certain aspect ratio. To scale and crop at
+the same time, taking the largest portion of the center of the original
+image that scales without distortion into the desired destination image:
+
+    pkImageConverter::cropOriginal("inputfile.jpg", "outputfile.jpg", 600, 450);
+
+The resulting image will be exactly 600x450 pixels, even if this requires
+leaving out part of the original.
+
+One more: scaleToNarrowerAxis. scaleToNarrowerAxis produces output
+images in which either the width or height will match the request and
+the other dimension will EXCEED the request (unless the aspect ratio
+of the original is exactly the same as the destination). This is handy
+for creating images that you intend to crop with CSS. The result is
+prettier than letterboxing.
+
+    pkImageConverter::scaleToNarrowerAxis("inputfile.jpg", "outputfile.jpg", 600, 450); 
+
+An optional JPEG quality argument may be specified as the final argument
+to all of these functions. The quality argument is ignored for other 
+output formats.
+
+The input file does not have to be in JPEG format. In fact, it can be
+in just about any format, certainly GIF, JPEG, PNG, TIFF and BMP.
+
+The output file can be in gif, jpeg, tiff, bmp, png, ppm, pbm, or pgm
+format (netpbm supports more, this is just what I've had time to list
+in the output filter array here). 
+
+The output file format is determined by the file extension. The input
+file format is determined automatically by the `anytopnm` command, which
+relies on the `file` command, which looks at the
+actual content of the file. This means you can convert a file uploaded
+to PHP via the web *without renaming it first.*
+
+Due to the use of `system()` and the piping of noisy messages from
+netpbm to `/dev/null` this code will not work without modification
+on Windows systems.
+
