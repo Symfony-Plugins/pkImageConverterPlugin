@@ -11,10 +11,13 @@ This makes importing huge originals practical.
 
 The netpbm utilities must be installed. Good hosts have them,
 others can easily install them ('apt-get install netpbm',
-'yum install netpbm-progs', etc. as appropriate to the OS). They are
-available for MacOS X here:
+'yum install netpbm-progs', etc. as appropriate to the OS). 
 
-http://netpbm.darwinports.com/
+Mac users can easily install them with fink:
+
+    fink install netpbm
+
+They are also available via macports (formerly darwinports).
 
 Even after you do that, though, they probably won't be in 
 the PATH environment variable for MAMP servers. So type:
@@ -32,7 +35,9 @@ Be sure to do a `symfony cc` and the tools should now be found.
 Note that you can use different settings for dev and prod to get
 this working on your development PC and the production server.
 
-This code probably won't work without modification on a Windows host.
+While the netpbm utilities exist for Windows, this plugin won't work without 
+modification on a Windows host because of the use of various sh shell
+tricks to hide noisy messages from the netpbm utilities.
 
 ## Usage ##
 
@@ -69,9 +74,15 @@ prettier than letterboxing.
 
     pkImageConverter::scaleToNarrowerAxis("inputfile.jpg", "outputfile.jpg", 600, 450); 
 
+Finally, you might want to simply convert between formats without
+scaling or cropping:
+
+    pkImageConverter::convertFormat("inputfile.jpg", "outputfile.png");
+
 An optional JPEG quality argument may be specified as the final argument
-to all of these functions. The quality argument is ignored for other 
-output formats.
+to all of these functions. The default JPEG quality is 75. JPEG quality
+is not a percentage, there is very little quality difference above
+85 or so. The quality argument is ignored for other output formats.
 
 The input file does not have to be in JPEG format. In fact, it can be
 in just about any format, certainly GIF, JPEG, PNG, TIFF and BMP.

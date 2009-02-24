@@ -193,8 +193,7 @@ class pkImageConverter
         $path .= "/";
       }
     }
-    $cmd = "(PATH=$path:\$PATH; export PATH; anytopnm < " . escapeshellarg($fileIn) . " " . ($extraInputFilters ? "| $extraInputFilters" : "") . " | pnmscale " .
-      "$scaleParameters | $filter " .
+    $cmd = "(PATH=$path:\$PATH; export PATH; anytopnm < " . escapeshellarg($fileIn) . " " . ($extraInputFilters ? "| $extraInputFilters" : "") . " " . ($scaleParameters ? "| pnmscale $scaleParameters " : "") . "| $filter " .
       "> " . escapeshellarg($fileOut) . " " .
       ") 2> /dev/null";
     sfContext::getInstance()->getLogger()->info("$cmd");
@@ -204,6 +203,12 @@ class pkImageConverter
       return false;
     }
     return true;
+  }
+
+  // Change the format without cropping or scaling
+  static public function convertFormat($fileIn, $fileOut, $quality = 75)
+  {
+    return self::scaleBody($fileIn, $fileOut, false, $quality);
   }
 }
 
