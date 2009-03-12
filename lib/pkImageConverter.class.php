@@ -98,6 +98,9 @@ class pkImageConverter
 
   static public function scaleToNarrowerAxis($fileIn, $fileOut, $width, $height, $quality = 75)
   {
+    $width = ceil($width);
+    $height = ceil($height);
+    $quality = ceil($quality);
     list($iwidth, $iheight) = getimagesize($fileIn); 
     if (!$iwidth) {
       return false;
@@ -115,6 +118,9 @@ class pkImageConverter
   static public function scaleToFit($fileIn, $fileOut, 
     $width, $height, $quality = 75)
   {
+    $width = ceil($width);
+    $height = ceil($height);
+    $quality = ceil($quality);
     if ($width === false) {
       $scaleParameters = "-ysize " . ($height + 0);
     } elseif ($height === false) {
@@ -128,6 +134,7 @@ class pkImageConverter
   static public function scaleByFactor($fileIn, $fileOut, $factor, 
     $quality = 75)
   {
+    $quality = ceil($quality);
     $scaleParameters = $factor + 0;  
     return self::scaleBody($fileIn, $fileOut, $scaleParameters, $quality);
   }
@@ -135,6 +142,9 @@ class pkImageConverter
   static public function cropOriginal($fileIn, $fileOut, $width, $height,
     $quality = 75)
   {
+    $width = ceil($width);
+    $height = ceil($height);
+    $quality = ceil($quality);
     list($iwidth, $iheight) = getimagesize($fileIn); 
     if (!$iwidth) 
     {
@@ -208,6 +218,7 @@ class pkImageConverter
   // Change the format without cropping or scaling
   static public function convertFormat($fileIn, $fileOut, $quality = 75)
   {
+    $quality = ceil($quality);
     return self::scaleBody($fileIn, $fileOut, false, $quality);
   }
 }
