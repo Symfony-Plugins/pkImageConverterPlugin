@@ -203,7 +203,13 @@ class pkImageConverter
         $path .= "/";
       }
     }
-    $cmd = "(PATH=$path:\$PATH; export PATH; anytopnm < " . escapeshellarg($fileIn) . " " . ($extraInputFilters ? "| $extraInputFilters" : "") . " " . ($scaleParameters ? "| pnmscale $scaleParameters " : "") . "| $filter " .
+    $input = 'anytopnm';
+    if (preg_match("/\.pdf$/", $fileIn))
+    {
+      $input = 'gs -sDEVICE=ppm -sOutputFile=- ' .
+        ' -dNOPAUSE -dFirstPage=1 -dLastPage=1 -r100 -q -';
+    }
+    $cmd = "(PATH=$path:\$PATH; export PATH; $input < " . escapeshellarg($fileIn) . " " . ($extraInputFilters ? "| $extraInputFilters" : "") . " " . ($scaleParameters ? "| pnmscale $scaleParameters " : "") . "| $filter " .
       "> " . escapeshellarg($fileOut) . " " .
       ") 2> /dev/null";
     sfContext::getInstance()->getLogger()->info("$cmd");
