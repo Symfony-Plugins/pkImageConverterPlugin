@@ -14,7 +14,12 @@
  *
  * http://netpbm.darwinports.com/
  *
- * Even after you do that, though, they probably won't be in 
+ * You can also pass PDFs as input files and generate renderings of
+ * the first page if you have the gs (ghostscript) command installed
+ * with its required fonts. On most systems (including MacPorts) you need 
+ * the "ghostscript" package. On some you also need "ghostscript-fonts".
+  
+ * The above commands probably won't be in 
  * the PATH environment variable for MAMP servers. So type:
  *
  * which ppmtogif

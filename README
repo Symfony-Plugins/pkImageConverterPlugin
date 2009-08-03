@@ -19,7 +19,15 @@ Mac users can easily install them with fink:
 
 They are also available via macports (formerly darwinports).
 
-Even after you do that, though, they probably won't be in 
+To add support for PDF as an input format, producing renderings of
+the first page in the requested output image format, add
+the ghostscript package:
+
+    fink install ghostscript
+    
+You may also need a ghostscript-fonts package.
+
+After you do the above, the commands in question probably still won't be in 
 the PATH environment variable for MAMP servers. So type:
 
 `which ppmtogif`
