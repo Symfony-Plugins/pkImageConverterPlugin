@@ -2,30 +2,54 @@
 
 "What is pkImageConverterPlugin?"
 
-pkImageConverterPlugin performs netpbm-based image conversions that don't 
-run the risk of bumping into PHP's memory limit. These use scanline-based 
-command line utilities that never allocate a two-dimensional image in memory.
+pkImageConverterPlugin is a high-speed, low-memory-usage tool for converting, scaling and
+cropping images without bumping into PHP's memory limit. When enabled, pkImageConverterPlugin
+uses the netpbm utilities to achieve these goals. These are scanline-based 
+command line utilities that never load an entire image into memory at once.
 This makes importing huge originals practical.
+
+However, by default, pkImageConverterPlugin uses the gd library. This change was made because
+many webmasters don't have root access to their servers to install netpbm, can't convince
+their hosts to do it for them, and/or just plain don't want to, no matter how big the
+performance boost is.
 
 ## Requirements ##
 
-The netpbm utilities must be installed. Good hosts have them,
-others can easily install them ('apt-get install netpbm',
-'yum install netpbm-progs', etc. as appropriate to the OS). 
+You must have EITHER support for gd in PHP, OR the netpbm utilities (of course it's fine
+if you have both). 
 
-Mac users can easily install them with fink:
+Good hosts already have both installed. Others can easily install them. 
 
-    fink install netpbm
+## For gd (possibly easier, but slow and memory-hungry) ##
 
-They are also available via macports (formerly darwinports).
+Check the output of the phpinfo() command on a test page. If gd support is not listed,
+you may have to install it. Most competent hosting companies give you gd as standard
+equipment in PHP, but not every hosting company is competent.
 
-To add support for PDF as an input format, producing renderings of
-the first page in the requested output image format, add
-the ghostscript package:
+For a Debian or Ubuntu Linux host:
 
-    fink install ghostscript
-    
-You may also need a ghostscript-fonts package.
+		apt-get install php5-gd
+
+For a Mac, just use the MAMP version of Apache and PHP rather than the built-in one.
+(Note: early reports are that Snow Leopard has gd built correctly in its standard PHP.)
+
+Most Windows PHP server configurations will already include gd.
+
+Note that you cannot import PDF documents with gd. JPEG, GIF, PNG and BMP files can be imported.
+You may hit your PHP memory limit when attempting to import large originals. For these
+reasons, netpbm is better if you can install it. (Windows users should stick with gd
+as the use of certain Unix shell features makes it difficult to port our netpbm
+support to Windows hosts.)
+
+## For netpbm (much better, but possibly not on your host... yet) ##
+
+For a Debian or Ubuntu-based Linux host:
+
+		apt-get install netpbm
+
+Mac users who use MacPorts can install netpbm with MacPorts:
+
+    port install netpbm
 
 After you do the above, the commands in question probably still won't be in 
 the PATH environment variable for MAMP servers. So type:
@@ -37,15 +61,33 @@ to help pkImageConverter find the programs:
 
     all:
       pkimageconverter:
+        # You must explicitly enable the use of netpbm
+        netpbm: true
         path: /wherever/they/are
 
 Be sure to do a `symfony cc` and the tools should now be found.
 Note that you can use different settings for dev and prod to get
 this working on your development PC and the production server.
 
-While the netpbm utilities exist for Windows, this plugin won't work without 
+While the netpbm utilities exist for Windows, this plugin's netpbm support won't work without 
 modification on a Windows host because of the use of various sh shell
-tricks to hide noisy messages from the netpbm utilities.
+tricks to hide noisy messages from the netpbm utilities. So we recommend using gd on
+a Windows host, especially if it's just your personal testing and debugging box. 
+Set the memory limit high.
+
+## For PDF Import ##
+
+To add support for PDF as an input format, producing renderings of
+the first page in the requested output image format, you must use netpbm and also
+install the ghostscript package. For a Mac:
+
+    port install ghostscript
+
+For a Linux host:
+
+    apt-get install ghostscript
+    
+You may also need a ghostscript-fonts package depending on your operating system.
 
 ## Usage ##
 
@@ -92,20 +134,21 @@ to all of these functions. The default JPEG quality is 75. JPEG quality
 is not a percentage, there is very little quality difference above
 85 or so. The quality argument is ignored for other output formats.
 
-The input file does not have to be in JPEG format. In fact, it can be
-in just about any format, certainly GIF, JPEG, PNG, TIFF and BMP.
+The input file does not have to be in JPEG format. If you are using gd
+(the default), it can be in GIF, JPEG, PNG or BMP format, provided PHP's
+gd support was compiled with support for those formats on your system
+(see the output of phpinfo()). If you are using netpbm (which must be
+enabled as described above), the original can be
+in just about any format, certainly GIF, JPEG, PNG, TIFF and BMP. 
+Even PDFs are supported if ghostscript is installed on the host.
 
-The output file can be in gif, jpeg, tiff, bmp, png, ppm, pbm, or pgm
+With netpbm, the output file can be in gif, jpeg, tiff, bmp, png, ppm, pbm, or pgm
 format (netpbm supports more, this is just what I've had time to list
-in the output filter array here). 
+in the output filter array). With gd, the output file can be in 
+GIF, JPEG, or PNG format, provided that gd was built with support for
+that format.
 
 The output file format is determined by the file extension. The input
-file format is determined automatically by the `anytopnm` command, which
-relies on the `file` command, which looks at the
-actual content of the file. This means you can convert a file uploaded
-to PHP via the web *without renaming it first.*
-
-Due to the use of `system()` and the piping of noisy messages from
-netpbm to `/dev/null` this code will not work without modification
-on Windows systems.
+file format is automatically detected based on its contents, not its extension.
+This means you can convert a file uploaded to PHP via the web *without renaming it first.*
 

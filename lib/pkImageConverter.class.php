@@ -2,95 +2,8 @@
 
 /*
  *
- * netpbm-based image conversions that don't run the risk of bumping
- * into PHP's memory limit. These use scanline-based command line
- * utilities that never allocate a two-dimensional image in memory.
- * This makes importing huge JPEGs practical. 
- *
- * The netpbm utilities must be installed. Good hosts have them,
- * others can easily install them ('apt-get install netpbm',
- * 'yum install netpbm-progs', etc. as appropriate to the OS). They are
- * available for MacOS X here:
- *
- * http://netpbm.darwinports.com/
- *
- * You can also pass PDFs as input files and generate renderings of
- * the first page if you have the gs (ghostscript) command installed
- * with its required fonts. On most systems (including MacPorts) you need 
- * the "ghostscript" package. On some you also need "ghostscript-fonts".
-  
- * The above commands probably won't be in 
- * the PATH environment variable for MAMP servers. So type:
- *
- * which ppmtogif
- *
- * Make a note of the folder it's in, and set things up in app.yml
- * to help pkImageConverter find the programs:
- *
- * all:
- *   pkimageconverter:
- *     path: /wherever/they/are
- *
- * Be sure to do a symfony cc and the tools should now be found.
- *
- * This code probably won't work without modification on a Windows host.
- *
- * Usage:
- *
- * Scale to largest size that does not exceed a width of 400 pixels or a
- * height of 300 pixels, but preserve aspect ratio, so the final image
- * will not be exactly 400x300 unless the original has a 4/3 ratio:
- *
- * pkImageConverter::scaleToFit("inputfile.jpg", "outputfile.jpg", 400, 300);
- *
- * If width or height is false (not zero), the other parameter will be
- * honored exactly and the mising parameter will be scaled accordingly to 
- * preserve the aspect ratio.
- *
- * Or to produce an image which is 50% of original size:
- *
- * pkImageConverter::scaleByFactor("inputfile.jpg", "outputfile.jpg", 0.5);
- *
- * Sometimes preserving the entire input image is not as important as
- * producing a copy with a certain aspect ratio. To scale and crop at
- * the same time, taking the largest portion of the center of the original
- * image that scales without distortion into the desired destination image:
- *
- * pkImageConverter::cropOriginal("inputfile.jpg", "outputfile.jpg",
- *   600, 450);
- *
- * The resulting image will be exactly 600x450 pixels, even if this requires
- * leaving out part of the original.
- *
- * One more: scaleToNarrowerAxis. scaleToNarrowerAxis produces output
- * images in which either the width or height will match the request and
- * the other dimension will EXCEED the request (unless the aspect ratio
- * of the original is exactly the same as the destination). This is handy
- * for creating images that you intend to crop with CSS. The result is
- * prettier than letterboxing.
-
- * pkImageConverter::scaleToNarrowerAxis("inputfile.jpg", "outputfile.jpg",
-     600, 450); 
- *
- * An optional JPEG quality argument may be specified as the final argument
- * to all of these functions. The quality argument is ignored for other 
- * output formats.
- * 
- * The input file does not have to be in JPEG format. In fact, it can be
- * in just about any format, certainly GIF, JPEG, PNG, TIFF and BMP.
- *
- * The output file can be in gif, jpeg, tiff, bmp, png, ppm, pbm, or pgm
- * format (netpbm supports more, this is just what I've had time to list
- * in the output filter array here). 
- * 
- * The output file format is determined by the file extension. The input
- * file format is determined by the 'file' command, which looks at the
- * actual content of the file. This means you can convert a file uploaded
- * to PHP without renaming it first.
- *
- * Due to the use of system() and the piping of noisy messages from
- * netpbm to /dev/null this code will not work without modification
- * on Windows systems. 
+ * Efficient image conversions using netpbm or (if netpbm is not available) gd.
+ * For more information see the README file.
  *
  */ 
 
@@ -123,25 +36,23 @@ class pkImageConverter
   static public function scaleToFit($fileIn, $fileOut, 
     $width, $height, $quality = 75)
   {
-    $width = ceil($width);
-    $height = ceil($height);
-    $quality = ceil($quality);
     if ($width === false) {
-      $scaleParameters = "-ysize " . ($height + 0);
+      $scaleParameters = array('ysize' => $height + 0);
     } elseif ($height === false) {
-      $scaleParameters = "-xsize " . ($width + 0);
+      $scaleParameters = array('xsize' => $width + 0);
     } else {
-      $scaleParameters = "-xysize " . ($width + 0) . " " . ($height + 0);
+      $scaleParameters = array('xysize' => array($width + 0, $height + 0));
     }
-    return self::scaleBody($fileIn, $fileOut, $scaleParameters, $quality);
+    $result = self::scaleBody($fileIn, $fileOut, $scaleParameters, array(), $quality);
+    return $result;
   }
 
   static public function scaleByFactor($fileIn, $fileOut, $factor, 
     $quality = 75)
   {
     $quality = ceil($quality);
-    $scaleParameters = $factor + 0;  
-    return self::scaleBody($fileIn, $fileOut, $scaleParameters, $quality);
+    $scaleParameters = array('scale' => $factor + 0);  
+    return self::scaleBody($fileIn, $fileOut, $scaleParameters, array(), $quality);
   }
 
   static public function cropOriginal($fileIn, $fileOut, $width, $height,
@@ -158,8 +69,7 @@ class pkImageConverter
     $iratio = $iwidth / $iheight;
     $ratio = $width / $height;
 
-    sfContext::getInstance()->getLogger()->info("iratio $iratio ratio $ratio\n");
-    $scale = "-xysize " . ($width + 0) . " " . ($height + 0); 
+    $scale = array('xysize' => array($width + 0, $height + 0));
     if ($iratio < $ratio)
     {
       $cropHeight = floor($iwidth * ($height / $width));
@@ -174,64 +84,254 @@ class pkImageConverter
       $cropTop = 0;
       $cropHeight = $iheight;
     }
-    return self::scaleBody($fileIn, $fileOut, $scale, $quality,
-      "pnmcut -left $cropLeft -top $cropTop -width $cropWidth -height $cropHeight");
-  }
-
-  static private function scaleBody($fileIn, $fileOut, 
-    $scaleParameters, $quality = 75, $extraInputFilters = false) 
-  {    
-    $outputFilters = array(
-      "jpg" => "pnmtojpeg --quality %d",
-      "jpeg" => "pnmtojpeg --quality %d",
-      "ppm" => "cat",
-      "pbm" => "cat",
-      "pgm" => "cat",
-      "tiff" => "pnmtotiff",
-      "png" => "pnmtopng",
-      "gif" => "ppmquant 256 | ppmtogif",
-      "bmp" => "ppmtobmp"
-    );
-    if (preg_match("/\.(\w+)$/", $fileOut, $matches)) {
-      $extension = $matches[1];
-      $extension = strtolower($extension);
-      if (!isset($outputFilters[$extension])) {
-        return false;
-      }
-      $filter = sprintf($outputFilters[$extension], $quality);
-    } else {
-      return false;
-    }
-    $path = sfConfig::get("app_pkimageconverter_path", "");
-    if (strlen($path)) {
-      if (!preg_match("/\/$/", $path)) {
-        $path .= "/";
-      }
-    }
-    $input = 'anytopnm';
-    if (preg_match("/\.pdf$/", $fileIn))
-    {
-      $input = 'gs -sDEVICE=ppm -sOutputFile=- ' .
-        ' -dNOPAUSE -dFirstPage=1 -dLastPage=1 -r100 -q -';
-    }
-    $cmd = "(PATH=$path:\$PATH; export PATH; $input < " . escapeshellarg($fileIn) . " " . ($extraInputFilters ? "| $extraInputFilters" : "") . " " . ($scaleParameters ? "| pnmscale $scaleParameters " : "") . "| $filter " .
-      "> " . escapeshellarg($fileOut) . " " .
-      ") 2> /dev/null";
-    sfContext::getInstance()->getLogger()->info("$cmd");
-    system($cmd, $result);
-    if ($result != 0) 
-    {
-      return false;
-    }
-    return true;
+    $scale = array('xysize' => array($width + 0, $height + 0));
+    $crop = array('left' => $cropLeft, 'top' => $cropTop, 'width' => $cropWidth, 'height' => $cropHeight);
+    return self::scaleBody($fileIn, $fileOut, $scale, $crop, $quality);
   }
 
   // Change the format without cropping or scaling
   static public function convertFormat($fileIn, $fileOut, $quality = 75)
   {
     $quality = ceil($quality);
-    return self::scaleBody($fileIn, $fileOut, false, $quality);
+    return self::scaleBody($fileIn, $fileOut, false, false, $quality);
   }
+
+  static private function scaleBody($fileIn, $fileOut, 
+    $scaleParameters = false, $cropParameters = false, $quality = 75) 
+  {    
+    if ($scaleParameters === false)
+    {
+      $scaleParameters = array();
+    }
+    if ($cropParameters === false)
+    {
+      $cropParameters = array();
+    }
+    if (sfConfig::get('app_pkimageconverter_netpbm', false))
+    {
+      $outputFilters = array(
+        "jpg" => "pnmtojpeg --quality %d",
+        "jpeg" => "pnmtojpeg --quality %d",
+        "ppm" => "cat",
+        "pbm" => "cat",
+        "pgm" => "cat",
+        "tiff" => "pnmtotiff",
+        "png" => "pnmtopng",
+        "gif" => "ppmquant 256 | ppmtogif",
+        "bmp" => "ppmtobmp"
+      );
+      if (preg_match("/\.(\w+)$/", $fileOut, $matches)) {
+        $extension = $matches[1];
+        $extension = strtolower($extension);
+        if (!isset($outputFilters[$extension])) {
+          return false;
+        }
+        $filter = sprintf($outputFilters[$extension], $quality);
+      } else {
+        return false;
+      }
+      $path = sfConfig::get("app_pkimageconverter_path", "");
+      if (strlen($path)) {
+        if (!preg_match("/\/$/", $path)) {
+          $path .= "/";
+        }
+      }
+      $input = 'anytopnm';
+      if (preg_match("/\.pdf$/", $fileIn))
+      {
+        $input = 'gs -sDEVICE=ppm -sOutputFile=- ' .
+          ' -dNOPAUSE -dFirstPage=1 -dLastPage=1 -r100 -q -';
+      }
+      $scaleString = '';
+      $extraInputFlters = '';
+      foreach ($scaleParameters as $key => $values)
+      {
+        $scaleString .= " -$key ";
+        if (is_array($values))
+        {
+          foreach ($values as $value)
+          {
+            $value = ceil($value);
+            $scaleString .= " $value";
+          }
+        }
+        else
+        {
+          $values = ceil($values);
+          $scaleString .= " $values";
+        }
+      }
+      if (count($cropParameters))
+      {
+        $extraInputFilters = 'pnmcut ';
+        foreach ($cropParameters as $ckey => $cvalue)
+        {
+          $cvalue = ceil($cvalue);
+          $extraInputFilters .= " -$ckey $cvalue";
+        }
+      }
+      
+      $cmd = "(PATH=$path:\$PATH; export PATH; $input < " . escapeshellarg($fileIn) . " " . ($extraInputFilters ? "| $extraInputFilters" : "") . " " . ($scaleParameters ? "| pnmscale $scaleString " : "") . "| $filter " .
+        "> " . escapeshellarg($fileOut) . " " .
+        ") 2> /dev/null";
+      sfContext::getInstance()->getLogger()->info("$cmd");
+      system($cmd, $result);
+      if ($result != 0) 
+      {
+        return false;
+      }
+      return true;
+    }
+    else
+    {
+      // gd version for those who can't install netpbm, poor buggers
+      // does not support PDF (if you can install ghostview, you can install netpbm)
+      $in = self::imagecreatefromany($fileIn);
+      $top = 0;
+      $left = 0;
+      $width = imagesx($in);
+      $height = imagesy($in);
+      if (count($cropParameters))
+      {
+        if (isset($cropParameters['top']))
+        {
+          $top = $cropParameters['top'];
+        }
+        if (isset($cropParameters['left']))
+        {
+          $left = $cropParameters['left'];
+        }
+        if (isset($cropParameters['width']))
+        {
+          $width = $cropParameters['width'];
+        }
+        if (isset($cropParameters['height']))
+        {
+          $height = $cropParameters['height'];
+        }
+        $cropped = imagecreatetruecolor($width, $height);
+        imagecopy($cropped, $in, 0, 0, $left, $top, $width, $height);
+        imagedestroy($in);
+        $in = null;
+      }
+      else
+      {
+        // No cropping, so don't waste time and memory
+        $cropped = $in;
+        $in = null;
+      }
+    
+      if (count($scaleParameters))
+      {
+        $width = imagesx($cropped);
+        $height = imagesy($cropped);
+        $swidth = $width;
+        $sheight = $height;
+        if (isset($scaleParameters['xsize']))
+        {
+          $height = $scaleParameters['xsize'] * imagesy($cropped) / imagesx($cropped);
+          $width = $scaleParameters['xsize'];
+          $out = imagecreatetruecolor($width, $height);
+          imagecopyresampled($out, $cropped, 0, 0, 0, 0, $width, $height, imagesx($cropped), imagesy($cropped));
+          imagedestroy($cropped);
+          $cropped = null;
+        }
+        elseif (isset($scaleParameters['ysize']))
+        {
+          $width = $scaleParameters['ysize'] * imagesx($cropped) / imagesy($cropped);
+          $height = $scaleParameters['ysize'];
+          $out = imagecreatetruecolor($width, $height);
+          imagecopyresampled($out, $cropped, 0, 0, 0, 0, $width, $height, imagesx($cropped), imagesy($cropped));
+          imagedestroy($cropped);
+          $cropped = null;
+        }
+        elseif (isset($scaleParameters['scale']))
+        {
+          $width = imagesx($cropped) * $scaleParameters['scale'];
+          $height = imagesy($cropped)* $scaleParameters['scale'];
+          $out = imagecreatetruecolor($width, $height);
+          imagecopyresampled($out, $cropped, 0, 0, 0, 0, $width, $height, imagesx($cropped), imagesy($cropped));
+          imagedestroy($cropped);
+          $cropped = null;
+        }
+        elseif (isset($scaleParameters['xysize']))
+        {
+          $width = $scaleParameters['xysize'][0];
+          $height = $scaleParameters['xysize'][1];
+          $out = imagecreatetruecolor($width, $height);
+          // This is the tricky bit
+          if (($width / $height) > ($swidth / $sheight))
+          {
+            // Wider than the original. Black bars left and right        
+            $iwidth = ceil($swidth * ($height / $sheight));
+            imagecopyresampled($out, $cropped, ($width - $iwidth) / 2, 0, 0, 0, 
+              $iwidth, $height, $swidth, $sheight);
+            imagedestroy($cropped);
+            $cropped = null;
+          }
+          else
+          {
+            // Narrower than the original. Letterboxing (bars top and bottom)
+            $iheight = ceil($sheight * ($width / $swidth));
+            imagecopyresampled($out, $cropped, 0, ($height - $iheight) / 2, 0, 0, 
+              $width, $iheight, $swidth, $sheight);
+            imagedestroy($cropped);
+            $cropped = null;
+          }
+        }
+      }
+      else
+      {
+        // No scaling, don't waste time and memory
+        $out = $cropped;
+        $cropped = null;
+      }
+
+      if (preg_match("/\.(\w+)$/i", $fileOut, $matches))
+      {
+        $extension = $matches[1];
+        $extension = strtolower($extension);
+        if ($extension === 'gif')
+        {
+          imagegif($out, $fileOut);
+        }
+        elseif (($extension === 'jpg') || ($extension === 'jpeg'))
+        {
+          imagejpeg($out, $fileOut, $quality);
+        }
+        elseif ($extension === 'png')
+        {
+          imagepng($out, $fileOut);
+        }
+        else
+        {
+          return false;
+        }
+      }
+      imagedestroy($out);
+      $out = null;
+      return true;
+    }
+  }
+
+  // Odds and ends missing from gd
+  
+  // As commonly found on the Internets
+
+  static private function imagecreatefromany($filename) 
+  {
+    foreach (array('png', 'jpeg', 'gif', 'bmp', 'ico') as $type) 
+    {
+      $func = 'imagecreatefrom' . $type;
+      if (is_callable($func)) 
+      {
+        $image = @call_user_func($func, $filename);
+        if ($image) return $image;
+      }
+    }
+    return false;
+  }
+
 }
 
 ?>
