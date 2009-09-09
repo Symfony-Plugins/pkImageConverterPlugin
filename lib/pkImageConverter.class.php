@@ -143,7 +143,7 @@ class pkImageConverter
           ' -dNOPAUSE -dFirstPage=1 -dLastPage=1 -r100 -q -';
       }
       $scaleString = '';
-      $extraInputFlters = '';
+      $extraInputFilters = '';
       foreach ($scaleParameters as $key => $values)
       {
         $scaleString .= " -$key ";
