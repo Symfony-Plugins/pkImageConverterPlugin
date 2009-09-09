@@ -107,7 +107,7 @@ class pkImageConverter
     {
       $cropParameters = array();
     }
-    if (sfConfig::get('app_pkimageconverter_netpbm', false))
+    if (sfConfig::get('app_pkimageconverter_netpbm', true))
     {
       $outputFilters = array(
         "jpg" => "pnmtojpeg --quality %d",

@@ -8,8 +8,7 @@ uses the netpbm utilities to achieve these goals. These are scanline-based
 command line utilities that never load an entire image into memory at once.
 This makes importing huge originals practical.
 
-However, by default, pkImageConverterPlugin uses the gd library. This change was made because
-many webmasters don't have root access to their servers to install netpbm, can't convince
+However, if explicitly selected, pkImageConverterPlugin can use the gd library. This change was made because many webmasters don't have root access to their servers to install netpbm, can't convince
 their hosts to do it for them, and/or just plain don't want to, no matter how big the
 performance boost is.
 
@@ -40,6 +39,16 @@ You may hit your PHP memory limit when attempting to import large originals. For
 reasons, netpbm is better if you can install it. (Windows users should stick with gd
 as the use of certain Unix shell features makes it difficult to port our netpbm
 support to Windows hosts.)
+
+Now explicitly disable netpbm:
+
+    all:
+      pkimageconverter:
+        # You must explicitly disable the use of netpbm
+        netpbm: false
+
+If you do not disable netpbm, pkImageConverterPlugin will default to using netpbm and
+will not attempt to use gd.
 
 ## For netpbm (much better, but possibly not on your host... yet) ##
 
@@ -134,11 +143,9 @@ to all of these functions. The default JPEG quality is 75. JPEG quality
 is not a percentage, there is very little quality difference above
 85 or so. The quality argument is ignored for other output formats.
 
-The input file does not have to be in JPEG format. If you are using gd
-(the default), it can be in GIF, JPEG, PNG or BMP format, provided PHP's
+The input file does not have to be in JPEG format. If you are using gd, it can be in GIF, JPEG, PNG or BMP format, provided PHP's
 gd support was compiled with support for those formats on your system
-(see the output of phpinfo()). If you are using netpbm (which must be
-enabled as described above), the original can be
+(see the output of phpinfo()). If you are using netpbm (the default), the original can be
 in just about any format, certainly GIF, JPEG, PNG, TIFF and BMP. 
 Even PDFs are supported if ghostscript is installed on the host.
 
