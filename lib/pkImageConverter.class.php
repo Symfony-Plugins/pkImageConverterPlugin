@@ -136,12 +136,46 @@ class pkImageConverter
           $path .= "/";
         }
       }
+      
+      // AUGH: some versions of anytopnm don't have
+      // the brains to look at the file signature. We need
+      // to be compatible with this brain damage, so pick
+      // the right filter based on the results of getimagesize()
+      // and punt to anytopnm only if we can't figure it out.
+      
+      // While we're at it: detect PDF by magic number too,
+      // not by extension, that's tacky
+
       $input = 'anytopnm';
-      if (preg_match("/\.pdf$/", $fileIn))
+      
+      $in = fopen($fileIn, 'r');
+      $bytes = fread($in, 4);
+      if ($bytes === '%PDF')
       {
         $input = 'gs -sDEVICE=ppm -sOutputFile=- ' .
           ' -dNOPAUSE -dFirstPage=1 -dLastPage=1 -r100 -q -';
       }
+      fclose($in);
+      
+      $info = getimagesize($fileIn);
+      if ($info !== false)
+      {
+        $type = $info[2];
+        if ($type === IMAGETYPE_GIF)
+        {
+          $input = 'giftopnm';
+        } 
+        elseif ($type === IMAGETYPE_PNG)
+        {
+          $input = 'pngtopnm';
+        }
+        elseif ($type === IMAGETYPE_JPEG)
+        {
+          $input = 'jpegtopnm';
+        }
+      }
+      
+    
       $scaleString = '';
       $extraInputFilters = '';
       foreach ($scaleParameters as $key => $values)
