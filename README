@@ -3,13 +3,12 @@
 "What is pkImageConverterPlugin?"
 
 pkImageConverterPlugin is a high-speed, low-memory-usage tool for converting, scaling and
-cropping images without bumping into PHP's memory limit. When enabled, pkImageConverterPlugin
+cropping images without bumping into PHP's memory limit. When available, pkImageConverterPlugin
 uses the netpbm utilities to achieve these goals. These are scanline-based 
 command line utilities that never load an entire image into memory at once.
 This makes importing huge originals practical.
 
-However, if explicitly selected, pkImageConverterPlugin can use the gd library. This change was made because many webmasters don't have root access to their servers to install netpbm, can't convince
-their hosts to do it for them, and/or just plain don't want to, no matter how big the
+However, when netpbm is not available, pkImageConverterPlugin automatically uses the gd library. This change was made because many webmasters don't have root access to their servers to install netpbm, can't convince their hosts to do it for them, and/or just plain don't want to, no matter how big the
 performance boost is.
 
 ## Requirements ##
@@ -40,15 +39,15 @@ reasons, netpbm is better if you can install it. (Windows users should stick wit
 as the use of certain Unix shell features makes it difficult to port our netpbm
 support to Windows hosts.)
 
-Now explicitly disable netpbm:
+OPTIONAL: with these settings in app.yml, you can explicitly disable netpbm to avoid a slight slowdown when the code attempts to use it before defaulting to gd.
 
     all:
       pkimageconverter:
-        # You must explicitly disable the use of netpbm
+        # You may explicitly disable the use of netpbm
         netpbm: false
 
 If you do not disable netpbm, pkImageConverterPlugin will default to using netpbm and
-will not attempt to use gd.
+will fall back to using gd only after that command fails (generally right away).
 
 ## For netpbm (much better, but possibly not on your host... yet) ##
 
@@ -70,8 +69,6 @@ to help pkImageConverter find the programs:
 
     all:
       pkimageconverter:
-        # You must explicitly enable the use of netpbm
-        netpbm: true
         path: /wherever/they/are
 
 Be sure to do a `symfony cc` and the tools should now be found.
@@ -82,7 +79,6 @@ While the netpbm utilities exist for Windows, this plugin's netpbm support won't
 modification on a Windows host because of the use of various sh shell
 tricks to hide noisy messages from the netpbm utilities. So we recommend using gd on
 a Windows host, especially if it's just your personal testing and debugging box. 
-Set the memory limit high.
 
 ## For PDF Import ##
 
