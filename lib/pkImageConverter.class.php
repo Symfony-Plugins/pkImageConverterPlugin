@@ -96,256 +96,263 @@ class pkImageConverter
     return self::scaleBody($fileIn, $fileOut, false, false, $quality);
   }
 
-  static private function scaleBody($fileIn, $fileOut, 
-    $scaleParameters = false, $cropParameters = false, $quality = 75) 
+  static private function scaleBody($fileIn, $fileOut, $scaleParameters = array(), $cropParameters = array(), $quality = 75) 
   {    
-    if ($scaleParameters === false)
-    {
-      $scaleParameters = array();
-    }
-    if ($cropParameters === false)
-    {
-      $cropParameters = array();
-    }
     if (sfConfig::get('app_pkimageconverter_netpbm', true))
     {
-      $outputFilters = array(
-        "jpg" => "pnmtojpeg --quality %d",
-        "jpeg" => "pnmtojpeg --quality %d",
-        "ppm" => "cat",
-        "pbm" => "cat",
-        "pgm" => "cat",
-        "tiff" => "pnmtotiff",
-        "png" => "pnmtopng",
-        "gif" => "ppmquant 256 | ppmtogif",
-        "bmp" => "ppmtobmp"
-      );
-      if (preg_match("/\.(\w+)$/", $fileOut, $matches)) {
-        $extension = $matches[1];
-        $extension = strtolower($extension);
-        if (!isset($outputFilters[$extension])) {
-          return false;
-        }
-        $filter = sprintf($outputFilters[$extension], $quality);
-      } else {
-        return false;
-      }
-      $path = sfConfig::get("app_pkimageconverter_path", "");
-      if (strlen($path)) {
-        if (!preg_match("/\/$/", $path)) {
-          $path .= "/";
-        }
-      }
-      
-      // AUGH: some versions of anytopnm don't have
-      // the brains to look at the file signature. We need
-      // to be compatible with this brain damage, so pick
-      // the right filter based on the results of getimagesize()
-      // and punt to anytopnm only if we can't figure it out.
-      
-      // While we're at it: detect PDF by magic number too,
-      // not by extension, that's tacky
-
-      $input = 'anytopnm';
-      
-      $in = fopen($fileIn, 'r');
-      $bytes = fread($in, 4);
-      if ($bytes === '%PDF')
+      // Auto fallback to gd
+      $result = self::scaleNetpbm($fileIn, $fileOut, $scaleParameters, $cropParameters, $quality);
+      if (!$result)
       {
-        $input = 'gs -sDEVICE=ppm -sOutputFile=- ' .
-          ' -dNOPAUSE -dFirstPage=1 -dLastPage=1 -r100 -q -';
+        sfContext::getInstance()->getLogger()->info("netpbm failed, not available? Trying gd");        
+        return self::scaleGd($fileIn, $fileOut, $scaleParameters, $cropParameters, $quality);
       }
-      fclose($in);
-      
-      $info = getimagesize($fileIn);
-      if ($info !== false)
-      {
-        $type = $info[2];
-        if ($type === IMAGETYPE_GIF)
-        {
-          $input = 'giftopnm';
-        } 
-        elseif ($type === IMAGETYPE_PNG)
-        {
-          $input = 'pngtopnm';
-        }
-        elseif ($type === IMAGETYPE_JPEG)
-        {
-          $input = 'jpegtopnm';
-        }
-      }
-      
-    
-      $scaleString = '';
-      $extraInputFilters = '';
-      foreach ($scaleParameters as $key => $values)
-      {
-        $scaleString .= " -$key ";
-        if (is_array($values))
-        {
-          foreach ($values as $value)
-          {
-            $value = ceil($value);
-            $scaleString .= " $value";
-          }
-        }
-        else
-        {
-          $values = ceil($values);
-          $scaleString .= " $values";
-        }
-      }
-      if (count($cropParameters))
-      {
-        $extraInputFilters = 'pnmcut ';
-        foreach ($cropParameters as $ckey => $cvalue)
-        {
-          $cvalue = ceil($cvalue);
-          $extraInputFilters .= " -$ckey $cvalue";
-        }
-      }
-      
-      $cmd = "(PATH=$path:\$PATH; export PATH; $input < " . escapeshellarg($fileIn) . " " . ($extraInputFilters ? "| $extraInputFilters" : "") . " " . ($scaleParameters ? "| pnmscale $scaleString " : "") . "| $filter " .
-        "> " . escapeshellarg($fileOut) . " " .
-        ") 2> /dev/null";
-      sfContext::getInstance()->getLogger()->info("$cmd");
-      system($cmd, $result);
-      if ($result != 0) 
-      {
-        return false;
-      }
-      return true;
     }
     else
     {
-      // gd version for those who can't install netpbm, poor buggers
-      // does not support PDF (if you can install ghostview, you can install netpbm)
-      $in = self::imagecreatefromany($fileIn);
-      $top = 0;
-      $left = 0;
-      $width = imagesx($in);
-      $height = imagesy($in);
-      if (count($cropParameters))
-      {
-        if (isset($cropParameters['top']))
-        {
-          $top = $cropParameters['top'];
-        }
-        if (isset($cropParameters['left']))
-        {
-          $left = $cropParameters['left'];
-        }
-        if (isset($cropParameters['width']))
-        {
-          $width = $cropParameters['width'];
-        }
-        if (isset($cropParameters['height']))
-        {
-          $height = $cropParameters['height'];
-        }
-        $cropped = imagecreatetruecolor($width, $height);
-        imagecopy($cropped, $in, 0, 0, $left, $top, $width, $height);
-        imagedestroy($in);
-        $in = null;
+      return self::scaleGd($fileIn, $fileOut, $scaleParameters, $cropParameters, $quality);
+    }
+  }
+  
+  static private function scaleNetpbm($fileIn, $fileOut, $scaleParameters = array(), $cropParameters = array(), $quality = 75)
+  {
+    $outputFilters = array(
+      "jpg" => "pnmtojpeg --quality %d",
+      "jpeg" => "pnmtojpeg --quality %d",
+      "ppm" => "cat",
+      "pbm" => "cat",
+      "pgm" => "cat",
+      "tiff" => "pnmtotiff",
+      "png" => "pnmtopng",
+      "gif" => "ppmquant 256 | ppmtogif",
+      "bmp" => "ppmtobmp"
+    );
+    if (preg_match("/\.(\w+)$/", $fileOut, $matches)) {
+      $extension = $matches[1];
+      $extension = strtolower($extension);
+      if (!isset($outputFilters[$extension])) {
+        return false;
       }
-      else
-      {
-        // No cropping, so don't waste time and memory
-        $cropped = $in;
-        $in = null;
+      $filter = sprintf($outputFilters[$extension], $quality);
+    } else {
+      return false;
+    }
+    $path = sfConfig::get("app_pkimageconverter_path", "");
+    if (strlen($path)) {
+      if (!preg_match("/\/$/", $path)) {
+        $path .= "/";
       }
+    }
     
-      if (count($scaleParameters))
+    // AUGH: some versions of anytopnm don't have
+    // the brains to look at the file signature. We need
+    // to be compatible with this brain damage, so pick
+    // the right filter based on the results of getimagesize()
+    // and punt to anytopnm only if we can't figure it out.
+    
+    // While we're at it: detect PDF by magic number too,
+    // not by extension, that's tacky
+
+    $input = 'anytopnm';
+    
+    $in = fopen($fileIn, 'r');
+    $bytes = fread($in, 4);
+    if ($bytes === '%PDF')
+    {
+      $input = 'gs -sDEVICE=ppm -sOutputFile=- ' .
+        ' -dNOPAUSE -dFirstPage=1 -dLastPage=1 -r100 -q -';
+    }
+    fclose($in);
+    
+    $info = getimagesize($fileIn);
+    if ($info !== false)
+    {
+      $type = $info[2];
+      if ($type === IMAGETYPE_GIF)
       {
-        $width = imagesx($cropped);
-        $height = imagesy($cropped);
-        $swidth = $width;
-        $sheight = $height;
-        if (isset($scaleParameters['xsize']))
+        $input = 'giftopnm';
+      } 
+      elseif ($type === IMAGETYPE_PNG)
+      {
+        $input = 'pngtopnm';
+      }
+      elseif ($type === IMAGETYPE_JPEG)
+      {
+        $input = 'jpegtopnm';
+      }
+    }
+    
+  
+    $scaleString = '';
+    $extraInputFilters = '';
+    foreach ($scaleParameters as $key => $values)
+    {
+      $scaleString .= " -$key ";
+      if (is_array($values))
+      {
+        foreach ($values as $value)
         {
-          $height = $scaleParameters['xsize'] * imagesy($cropped) / imagesx($cropped);
-          $width = $scaleParameters['xsize'];
-          $out = imagecreatetruecolor($width, $height);
-          imagecopyresampled($out, $cropped, 0, 0, 0, 0, $width, $height, imagesx($cropped), imagesy($cropped));
-          imagedestroy($cropped);
-          $cropped = null;
-        }
-        elseif (isset($scaleParameters['ysize']))
-        {
-          $width = $scaleParameters['ysize'] * imagesx($cropped) / imagesy($cropped);
-          $height = $scaleParameters['ysize'];
-          $out = imagecreatetruecolor($width, $height);
-          imagecopyresampled($out, $cropped, 0, 0, 0, 0, $width, $height, imagesx($cropped), imagesy($cropped));
-          imagedestroy($cropped);
-          $cropped = null;
-        }
-        elseif (isset($scaleParameters['scale']))
-        {
-          $width = imagesx($cropped) * $scaleParameters['scale'];
-          $height = imagesy($cropped)* $scaleParameters['scale'];
-          $out = imagecreatetruecolor($width, $height);
-          imagecopyresampled($out, $cropped, 0, 0, 0, 0, $width, $height, imagesx($cropped), imagesy($cropped));
-          imagedestroy($cropped);
-          $cropped = null;
-        }
-        elseif (isset($scaleParameters['xysize']))
-        {
-          $width = $scaleParameters['xysize'][0];
-          $height = $scaleParameters['xysize'][1];
-          $out = imagecreatetruecolor($width, $height);
-          // This is the tricky bit
-          if (($width / $height) > ($swidth / $sheight))
-          {
-            // Wider than the original. Black bars left and right        
-            $iwidth = ceil($swidth * ($height / $sheight));
-            imagecopyresampled($out, $cropped, ($width - $iwidth) / 2, 0, 0, 0, 
-              $iwidth, $height, $swidth, $sheight);
-            imagedestroy($cropped);
-            $cropped = null;
-          }
-          else
-          {
-            // Narrower than the original. Letterboxing (bars top and bottom)
-            $iheight = ceil($sheight * ($width / $swidth));
-            imagecopyresampled($out, $cropped, 0, ($height - $iheight) / 2, 0, 0, 
-              $width, $iheight, $swidth, $sheight);
-            imagedestroy($cropped);
-            $cropped = null;
-          }
+          $value = ceil($value);
+          $scaleString .= " $value";
         }
       }
       else
       {
-        // No scaling, don't waste time and memory
-        $out = $cropped;
+        $values = ceil($values);
+        $scaleString .= " $values";
+      }
+    }
+    if (count($cropParameters))
+    {
+      $extraInputFilters = 'pnmcut ';
+      foreach ($cropParameters as $ckey => $cvalue)
+      {
+        $cvalue = ceil($cvalue);
+        $extraInputFilters .= " -$ckey $cvalue";
+      }
+    }
+    
+    $cmd = "(PATH=$path:\$PATH; export PATH; $input < " . escapeshellarg($fileIn) . " " . ($extraInputFilters ? "| $extraInputFilters" : "") . " " . ($scaleParameters ? "| pnmscale $scaleString " : "") . "| $filter " .
+      "> " . escapeshellarg($fileOut) . " " .
+      ") 2> /dev/null";
+    sfContext::getInstance()->getLogger()->info("$cmd");
+    system($cmd, $result);
+    if ($result != 0) 
+    {
+      return false;
+    }
+    return true;
+  }
+  
+  static private function scaleGd($fileIn, $fileOut, $scaleParameters = array(), $cropParameters = array(), $quality = 75)
+  {
+    // gd version for those who can't install netpbm, poor buggers
+    // does not support PDF (if you can install ghostview, you can install netpbm)
+    $in = self::imagecreatefromany($fileIn);
+    $top = 0;
+    $left = 0;
+    $width = imagesx($in);
+    $height = imagesy($in);
+    if (count($cropParameters))
+    {
+      if (isset($cropParameters['top']))
+      {
+        $top = $cropParameters['top'];
+      }
+      if (isset($cropParameters['left']))
+      {
+        $left = $cropParameters['left'];
+      }
+      if (isset($cropParameters['width']))
+      {
+        $width = $cropParameters['width'];
+      }
+      if (isset($cropParameters['height']))
+      {
+        $height = $cropParameters['height'];
+      }
+      $cropped = imagecreatetruecolor($width, $height);
+      imagecopy($cropped, $in, 0, 0, $left, $top, $width, $height);
+      imagedestroy($in);
+      $in = null;
+    }
+    else
+    {
+      // No cropping, so don't waste time and memory
+      $cropped = $in;
+      $in = null;
+    }
+  
+    if (count($scaleParameters))
+    {
+      $width = imagesx($cropped);
+      $height = imagesy($cropped);
+      $swidth = $width;
+      $sheight = $height;
+      if (isset($scaleParameters['xsize']))
+      {
+        $height = $scaleParameters['xsize'] * imagesy($cropped) / imagesx($cropped);
+        $width = $scaleParameters['xsize'];
+        $out = imagecreatetruecolor($width, $height);
+        imagecopyresampled($out, $cropped, 0, 0, 0, 0, $width, $height, imagesx($cropped), imagesy($cropped));
+        imagedestroy($cropped);
         $cropped = null;
       }
-
-      if (preg_match("/\.(\w+)$/i", $fileOut, $matches))
+      elseif (isset($scaleParameters['ysize']))
       {
-        $extension = $matches[1];
-        $extension = strtolower($extension);
-        if ($extension === 'gif')
+        $width = $scaleParameters['ysize'] * imagesx($cropped) / imagesy($cropped);
+        $height = $scaleParameters['ysize'];
+        $out = imagecreatetruecolor($width, $height);
+        imagecopyresampled($out, $cropped, 0, 0, 0, 0, $width, $height, imagesx($cropped), imagesy($cropped));
+        imagedestroy($cropped);
+        $cropped = null;
+      }
+      elseif (isset($scaleParameters['scale']))
+      {
+        $width = imagesx($cropped) * $scaleParameters['scale'];
+        $height = imagesy($cropped)* $scaleParameters['scale'];
+        $out = imagecreatetruecolor($width, $height);
+        imagecopyresampled($out, $cropped, 0, 0, 0, 0, $width, $height, imagesx($cropped), imagesy($cropped));
+        imagedestroy($cropped);
+        $cropped = null;
+      }
+      elseif (isset($scaleParameters['xysize']))
+      {
+        $width = $scaleParameters['xysize'][0];
+        $height = $scaleParameters['xysize'][1];
+        $out = imagecreatetruecolor($width, $height);
+        // This is the tricky bit
+        if (($width / $height) > ($swidth / $sheight))
         {
-          imagegif($out, $fileOut);
-        }
-        elseif (($extension === 'jpg') || ($extension === 'jpeg'))
-        {
-          imagejpeg($out, $fileOut, $quality);
-        }
-        elseif ($extension === 'png')
-        {
-          imagepng($out, $fileOut);
+          // Wider than the original. Black bars left and right        
+          $iwidth = ceil($swidth * ($height / $sheight));
+          imagecopyresampled($out, $cropped, ($width - $iwidth) / 2, 0, 0, 0, 
+            $iwidth, $height, $swidth, $sheight);
+          imagedestroy($cropped);
+          $cropped = null;
         }
         else
         {
-          return false;
+          // Narrower than the original. Letterboxing (bars top and bottom)
+          $iheight = ceil($sheight * ($width / $swidth));
+          imagecopyresampled($out, $cropped, 0, ($height - $iheight) / 2, 0, 0, 
+            $width, $iheight, $swidth, $sheight);
+          imagedestroy($cropped);
+          $cropped = null;
         }
       }
-      imagedestroy($out);
-      $out = null;
-      return true;
     }
+    else
+    {
+      // No scaling, don't waste time and memory
+      $out = $cropped;
+      $cropped = null;
+    }
+
+    if (preg_match("/\.(\w+)$/i", $fileOut, $matches))
+    {
+      $extension = $matches[1];
+      $extension = strtolower($extension);
+      if ($extension === 'gif')
+      {
+        imagegif($out, $fileOut);
+      }
+      elseif (($extension === 'jpg') || ($extension === 'jpeg'))
+      {
+        imagejpeg($out, $fileOut, $quality);
+      }
+      elseif ($extension === 'png')
+      {
+        imagepng($out, $fileOut);
+      }
+      else
+      {
+        return false;
+      }
+    }
+    imagedestroy($out);
+    $out = null;
+    return true;
   }
 
   // Odds and ends missing from gd
@@ -365,7 +372,4 @@ class pkImageConverter
     }
     return false;
   }
-
 }
-
-?>
