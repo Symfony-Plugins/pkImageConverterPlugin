@@ -143,7 +143,7 @@ The input file does not have to be in JPEG format. If you are using gd, it can b
 gd support was compiled with support for those formats on your system
 (see the output of phpinfo()). If you are using netpbm (the default), the original can be
 in just about any format, certainly GIF, JPEG, PNG, TIFF and BMP. 
-Even PDFs are supported if ghostscript is installed on the host.
+Also, PDFs are supported as an input format if ghostscript and netpbm are installed on the host.
 
 With netpbm, the output file can be in gif, jpeg, tiff, bmp, png, ppm, pbm, or pgm
 format (netpbm supports more, this is just what I've had time to list
