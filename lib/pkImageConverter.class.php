@@ -354,6 +354,76 @@ class pkImageConverter
     $out = null;
     return true;
   }
+  
+  // Retrieves what you really want to know about an image file, PDFs included,
+  // before making calls such as the above based on good information.
+  
+  // Returns as follows:
+  
+  // array('format' => 'file extension: gif, jpg, png or pdf', 'width' => width in pixels, 'height' => height in pixels);
+
+  // $format is the recommended file extension based on the actual file type, not the user's (possibly totally false or absent)
+  // claimed file extension.
+  
+  // If the file does not have a valid header identifying it as one of these types, false is returned.
+  
+  static public function getInfo($file)
+  {
+    $result = array();
+    $in = fopen($file, "rb");
+    $data = fread($in, 4);
+    fclose($in);
+    if ($data === '%PDF')
+    {
+      $result['format'] = 'pdf';
+      $path = sfConfig::get("app_pkimageconverter_path", "");
+      if (strlen($path)) {
+        if (!preg_match("/\/$/", $path)) {
+          $path .= "/";
+        }
+      }
+      # Bounding box goes to stderr, not stdout! Charming
+      $cmd = "(PATH=$path:\$PATH; export PATH; gs -sDEVICE=bbox -dNOPAUSE -dFirstPage=1 -dLastPage=1 -r100 -q " . escapeshellarg($file) . " -c quit) 2>&1";
+      $in = popen($cmd, "r");
+      $data = stream_get_contents($in);
+      pclose($in);
+      // Actual nonfatal errors in the bbox output mean it's not safe to just
+      // read this naively with fscanf, look for the good part
+      if (preg_match("/%%BoundingBox: \d+ \d+ (\d+) (\d+)/", $data, $matches))
+      {
+        $result['width'] = $matches[1];
+        $result['height'] = $matches[2];
+      }
+      else
+      {
+        // Bad PDF
+        return false;
+      }
+      return $result;
+    }
+    else
+    {
+      $formats = array(
+        IMAGETYPE_JPEG => "jpg",
+        IMAGETYPE_PNG => "png",
+        IMAGETYPE_GIF => "gif"
+      );
+      $data = getimagesize($file);
+      if (count($data) < 3)
+      {
+        return false;
+      }
+      if (!isset($formats[$data[2]]))
+      {
+        return false;
+      }
+      $format = $formats[$data[2]];
+      $result['width'] = $data[0];
+      $result['height'] = $data[1];
+      $result['format'] = $format;
+      return $result;
+    }
+  }
 
   // Odds and ends missing from gd
   
