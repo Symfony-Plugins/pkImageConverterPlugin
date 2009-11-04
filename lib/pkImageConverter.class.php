@@ -143,7 +143,7 @@ class pkImageConverter
         $path .= "/";
       }
     }
-    
+        
     // AUGH: some versions of anytopnm don't have
     // the brains to look at the file signature. We need
     // to be compatible with this brain damage, so pick
