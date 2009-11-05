@@ -33,8 +33,7 @@ class pkImageConverter
     return self::scaleToFit($fileIn, $fileOut, $width, $height, $quality);
   }
 
-  static public function scaleToFit($fileIn, $fileOut, 
-    $width, $height, $quality = 75)
+  static public function scaleToFit($fileIn, $fileOut, $width, $height, $quality = 75)
   {
     if ($width === false) {
       $scaleParameters = array('ysize' => $height + 0);
@@ -55,8 +54,7 @@ class pkImageConverter
     return self::scaleBody($fileIn, $fileOut, $scaleParameters, array(), $quality);
   }
 
-  static public function cropOriginal($fileIn, $fileOut, $width, $height,
-    $quality = 75)
+  static public function cropOriginal($fileIn, $fileOut, $width, $height, $quality = 75)
   {
     $width = ceil($width);
     $height = ceil($height);
@@ -382,7 +380,7 @@ class pkImageConverter
           $path .= "/";
         }
       }
-      # Bounding box goes to stderr, not stdout! Charming
+      // Bounding box goes to stderr, not stdout! Charming
       $cmd = "(PATH=$path:\$PATH; export PATH; gs -sDEVICE=bbox -dNOPAUSE -dFirstPage=1 -dLastPage=1 -r100 -q " . escapeshellarg($file) . " -c quit) 2>&1";
       $in = popen($cmd, "r");
       $data = stream_get_contents($in);
