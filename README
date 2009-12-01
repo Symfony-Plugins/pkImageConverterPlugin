@@ -11,6 +11,8 @@ This makes importing huge originals practical.
 However, when netpbm is not available, pkImageConverterPlugin automatically uses the gd library. This change was made because many webmasters don't have root access to their servers to install netpbm, can't convince their hosts to do it for them, and/or just plain don't want to, no matter how big the
 performance boost is.
 
+pkImageConverterPlugin can be used by itself and is also part of a suite of plugins that make up the [Apostrophe Content Management System](http://www.apostrophenow.com/). The philosophy of Apostrophe is that editing should be done "in context" whenever possible.
+
 ## Requirements ##
 
 You must have EITHER support for gd in PHP, OR the netpbm utilities (of course it's fine
