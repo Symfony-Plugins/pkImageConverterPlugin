@@ -382,6 +382,7 @@ class pkImageConverter
       }
       // Bounding box goes to stderr, not stdout! Charming
       $cmd = "(PATH=$path:\$PATH; export PATH; gs -sDEVICE=bbox -dNOPAUSE -dFirstPage=1 -dLastPage=1 -r100 -q " . escapeshellarg($file) . " -c quit) 2>&1";
+      sfContext::getInstance()->getLogger()->info("PDFINFO: $cmd");
       $in = popen($cmd, "r");
       $data = stream_get_contents($in);
       pclose($in);
