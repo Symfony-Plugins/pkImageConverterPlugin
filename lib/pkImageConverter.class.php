@@ -298,26 +298,20 @@ class pkImageConverter
       {
         $width = $scaleParameters['xysize'][0];
         $height = $scaleParameters['xysize'][1];
-        $out = imagecreatetruecolor($width, $height);
-        // This is the tricky bit
         if (($width / $height) > ($swidth / $sheight))
         {
-          // Wider than the original. Black bars left and right        
-          $iwidth = ceil($swidth * ($height / $sheight));
-          imagecopyresampled($out, $cropped, ($width - $iwidth) / 2, 0, 0, 0, 
-            $iwidth, $height, $swidth, $sheight);
-          imagedestroy($cropped);
-          $cropped = null;
+          // Wider than the original. So it will be shorter than requested
+          $height = ceil($width * ($sheight / $swidth));
         }
         else
         {
-          // Narrower than the original. Letterboxing (bars top and bottom)
-          $iheight = ceil($sheight * ($width / $swidth));
-          imagecopyresampled($out, $cropped, 0, ($height - $iheight) / 2, 0, 0, 
-            $width, $iheight, $swidth, $sheight);
-          imagedestroy($cropped);
-          $cropped = null;
+          // Taller than the original. So it will be narrower than requested
+          $width = ceil($height * ($swidth / $sheight));
         }
+        $out = imagecreatetruecolor($width, $height);
+        imagecopyresampled($out, $cropped, 0, 0, 0, 0, $width, $height, $swidth, $sheight);
+        imagedestroy($cropped);
+        $cropped = null;
       }
     }
     else
